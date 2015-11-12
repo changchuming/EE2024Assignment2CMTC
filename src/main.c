@@ -61,6 +61,8 @@ static void drawOled(uint8_t joyState);
 void sendControlSeq(uint8_t* seq);
 void stopCanvas();
 void stopMusic();
+void sw3Interrupt();
+static void lightningInterruptHandler();
 
 //-----------------------------------------------------------------------------------------
 // Modes
@@ -394,6 +396,37 @@ void blank7Seg() {
 }
 
 // ########################################################################################
+// Common: Blank OLED
+// ########################################################################################
+void blankOLED() {
+	oled_clearScreen(OLED_COLOR_BLACK);
+	isOLEDOn = 0;
+}
+
+// ########################################################################################
+// Common: Turn off RGB LED
+// ########################################################################################
+void blankRGBLED() {
+	rgb_setLeds(RGB_GREEN);
+}
+
+// ########################################################################################
+// Common: Send control seq to position cursor
+// ########################################################################################
+void sendControlSeq(uint8_t* seq) {
+	uint8_t data = 27;
+	UART_Send(LPC_UART3, &data, 1, BLOCKING);
+	UART_Send(LPC_UART3, (uint8_t *)seq , strlen(seq), BLOCKING);
+}
+
+// ########################################################################################
+// Common: Debounce callback for UART
+// ########################################################################################
+void UARTDebounceTimeout() {
+	isUARTDebounced = 0;
+}
+
+// ########################################################################################
 // STARTER: Show sequence
 // ########################################################################################
 void showStartingSeq() {
@@ -466,12 +499,6 @@ void setRGBLEDColor(uint8_t newColor) {
     }
 }
 
-// ########################################################################################
-// Common: Turn off RGB LED
-// ########################################################################################
-void blankRGBLED() {
-	rgb_setLeds(RGB_GREEN);
-}
 
 // ########################################################################################
 // EXPLORER & SURVIVAL: Read sensor values, display on OLED and send to home
@@ -531,14 +558,6 @@ void getSensorValues() {
 	oled_putString(45, 30, myString, OLED_COLOR_WHITE, OLED_COLOR_BLACK);
 	myString = (uint8_t *) zAxisC;
 	oled_putString(45, 40, myString, OLED_COLOR_WHITE, OLED_COLOR_BLACK);
-}
-
-// ########################################################################################
-// Common: Blank OLED
-// ########################################################################################
-void blankOLED() {
-	oled_clearScreen(OLED_COLOR_BLACK);
-	isOLEDOn = 0;
 }
 
 // ########################################################################################
@@ -848,7 +867,31 @@ static void playSong(uint8_t *song) {
 }
 
 // ########################################################################################
-// Common: Interrupt when trigger button (SW3) is pressed
+// Interrupt: EINT3 Interrupt Handler (GPIO Interrupt Handler)
+// ########################################################################################
+void EINT3_IRQHandler(void)
+{
+//	int i;
+	// Determine whether GPIO Interrupt P2.10 has occurred (SW3)
+	if ((LPC_GPIOINT->IO2IntStatF>>10)& 0x1)
+	{
+		sw3Interrupt();
+
+        // Clear GPIO Interrupt P2.10
+        LPC_GPIOINT->IO2IntClr = 1<<10;
+	}
+	// Determine whether GPIO Interrupt P2.5 has occurred (Light sensor)
+	if ((LPC_GPIOINT->IO2IntStatF>>5)& 0x1)
+	{
+        lightningInterruptHandler();
+
+        // Clear GPIO Interrupt P2.5
+        LPC_GPIOINT->IO2IntClr = 1<<5;
+	}
+}
+
+// ########################################################################################
+// Interrupt (Common): when trigger button (SW3) is pressed
 // ########################################################################################
 void sw3Interrupt() {
 	Task *triggerSensorTask = newTask(&getSensorValues, 0, 1, TICK_MILLIS);
@@ -857,7 +900,7 @@ void sw3Interrupt() {
 }
 
 // ########################################################################################
-// EXPLORER & SURVIVAL: Interrupt when light goes above or below LIGHTNING_THRESHOLD
+// Interrupt (EXPLORER & SURVIVAL): Interrupt when light goes above or below LIGHTNING_THRESHOLD
 // ########################################################################################
 static void lightningInterruptHandler()
 {
@@ -883,7 +926,7 @@ static void lightningInterruptHandler()
 				hasModeChanged = 1;
 			}
 			Task *lightningTimeoutTask;
-			lightningTimeoutTask = newTask(&lightningTimeout, 3000-(msTicks-lightningStartTicks), 1, TICK_MILLIS);
+			lightningTimeoutTask = newTask(&lightningTimeout, LIGHTNING_TIME_WINDOW-(msTicks-lightningStartTicks), 1, TICK_MILLIS);
 			addTask(fastTaskList, &fastTaskCount, lightningTimeoutTask);
 			updateLightningCount();
 		}
@@ -898,47 +941,7 @@ static void lightningInterruptHandler()
 }
 
 // ########################################################################################
-// Common: Send control seq to position cursor
-// ########################################################################################
-void sendControlSeq(uint8_t* seq) {
-	uint8_t data = 27;
-	UART_Send(LPC_UART3, &data, 1, BLOCKING);
-	UART_Send(LPC_UART3, (uint8_t *)seq , strlen(seq), BLOCKING);
-}
-
-// ########################################################################################
-// Common: Debounce callback for UART
-// ########################################################################################
-void UARTDebounceTimeout() {
-	isUARTDebounced = 0;
-}
-
-// ########################################################################################
-// EINT3 Interrupt Handler (GPIO Interrupt Handler)
-// ########################################################################################
-void EINT3_IRQHandler(void)
-{
-//	int i;
-	// Determine whether GPIO Interrupt P2.10 has occurred (SW3)
-	if ((LPC_GPIOINT->IO2IntStatF>>10)& 0x1)
-	{
-		sw3Interrupt();
-
-        // Clear GPIO Interrupt P2.10
-        LPC_GPIOINT->IO2IntClr = 1<<10;
-	}
-	// Determine whether GPIO Interrupt P2.5 has occurred (Light sensor)
-	if ((LPC_GPIOINT->IO2IntStatF>>5)& 0x1)
-	{
-        lightningInterruptHandler();
-
-        // Clear GPIO Interrupt P2.5
-        LPC_GPIOINT->IO2IntClr = 1<<5;
-	}
-}
-
-// ########################################################################################
-// Timer0 interrupt handler - used for running fastTaskList
+// Interrupt: Timer0 interrupt handler - used for running fastTaskList
 // ########################################################################################
 void TIMER0_IRQHandler(void) {
 	TIM_Cmd(LPC_TIM0, DISABLE);
@@ -952,7 +955,7 @@ void TIMER0_IRQHandler(void) {
 }
 
 // ########################################################################################
-// UART3 interrupt handler - calls standard UART interrupt handler
+// Interrupt: UART3 interrupt handler - calls standard UART interrupt handler
 // ########################################################################################
 void UART3_IRQHandler(void) {
 	// Call Standard UART 3 interrupt handler
@@ -960,7 +963,7 @@ void UART3_IRQHandler(void) {
 }
 
 // ########################################################################################
-// UART3 receive interrupt handler - triggered when data received
+// Interrupt: UART3 receive interrupt handler - triggered when data received
 // ########################################################################################
 void UART3ReceiveInterruptHandler() {
 	uint8_t input = 0;
@@ -1224,11 +1227,6 @@ void stopSurvival() {
 // CANVAS: Stop canvas mode
 // ########################################################################################
 void stopCanvas() {
-    /* ---- Speaker ------> */
-    GPIO_SetDir(0, 1<<27, 0);
-    GPIO_SetDir(0, 1<<28, 0);
-    GPIO_SetDir(2, 1<<13, 0);
-    /* <---- Speaker ------ */
 	// Blank Oled
 	blankOLED();
 	// Stop reading joystick
@@ -1443,6 +1441,7 @@ int main (void) {
 						break;
 					case CANVAS:
 						stopCanvas();
+						break;
 					case MUSIC:
 						stopMusic();
 						break;
@@ -1461,8 +1460,10 @@ int main (void) {
 						break;
 					case CANVAS:
 						startCanvas();
+						break;
 					case MUSIC:
 						startMusic();
+						break;
 					default:
 						break;
 				}
