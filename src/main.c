@@ -218,7 +218,6 @@ static void init_ssp(void)
 
 	// Enable SSP peripheral
 	SSP_Cmd(LPC_SSP1, ENABLE);
-
 }
 
 // ########################################################################################
@@ -475,7 +474,7 @@ void blankRGBLED() {
 }
 
 // ########################################################################################
-// Common: Read sensor values, display on OLED and send to home
+// EXPLORER & SURVIVAL: Read sensor values, display on OLED and send to home
 // ########################################################################################
 void getSensorValues() {
 	// Get light sensor value
@@ -543,7 +542,7 @@ void blankOLED() {
 }
 
 // ########################################################################################
-// Common: Update lightning count
+// EXPLORER & SURVIVAL: Update lightning count
 // ########################################################################################
 void updateLightningCount() {
 	if (lightningCount==0) {
@@ -555,7 +554,7 @@ void updateLightningCount() {
 }
 
 // ########################################################################################
-// Common: Callback for lightning timeout
+// EXPLORER & SURVIVAL: Callback for lightning timeout
 // ########################################################################################
 void lightningTimeout() {
 	lightningCount--;
@@ -563,7 +562,7 @@ void lightningTimeout() {
 }
 
 // ########################################################################################
-// Common: Enable lightning detector
+// EXPLORER & SURVIVAL: Enable lightning detector
 // ########################################################################################
 void enableLightningDetector()
 {
@@ -573,7 +572,7 @@ void enableLightningDetector()
 }
 
 // ########################################################################################
-// Common: Disable lightning detector
+// EXPLORER & SURVIVAL: Disable lightning detector
 // ########################################################################################
 void disableLightningDetector()
 {
@@ -858,7 +857,7 @@ void sw3Interrupt() {
 }
 
 // ########################################################################################
-// Common: Interrupt when light goes above or below LIGHTNING_THRESHOLD
+// EXPLORER & SURVIVAL: Interrupt when light goes above or below LIGHTNING_THRESHOLD
 // ########################################################################################
 static void lightningInterruptHandler()
 {
@@ -969,7 +968,7 @@ void UART3ReceiveInterruptHandler() {
 	uint32_t len = 0;
 	uint8_t song[MAX_SONG_LENGTH];
 
-	//test receiving a letter and sending back to port
+	// Receives a character
 	UART_Receive(LPC_UART3, &input, 1, NONE_BLOCKING);
 
 	if (!isUARTDebounced) {
